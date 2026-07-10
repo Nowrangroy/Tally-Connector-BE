@@ -4,16 +4,12 @@ const ApiError = require('../utils/ApiError');
 const { normalizePhoneNumber } = require('../utils/phone');
 
 /**
- * Create a user (admin only or public registration)
+ * Create a user (admin only)
  * @param {Object} userBody
  * @param {ObjectId} [createdById] - ID of the admin creating the user
  * @returns {Promise<User>}
  */
 const createUser = async (userBody, createdById) => {
-  if (userBody.email && (await User.isEmailTaken(userBody.email))) {
-    throw new ApiError(httpStatus.BAD_REQUEST, 'Email already taken');
-  }
-
   let phoneNumber;
   if (userBody.phoneNumber) {
     phoneNumber = normalizePhoneNumber(userBody.phoneNumber);
@@ -25,12 +21,11 @@ const createUser = async (userBody, createdById) => {
   // Remove duplicates and empty strings from companies
   const companies = [...new Set((userBody.companies || []).map((c) => c.trim()).filter(Boolean))];
 
+  // Only seed script can create admins; API always creates as user
   return User.create({
     name: userBody.name,
-    email: userBody.email,
-    password: userBody.password,
     phoneNumber,
-    role: userBody.role || 'user',
+    role: 'user',
     companies,
     createdBy: createdById,
   });
@@ -46,7 +41,14 @@ const createUser = async (userBody, createdById) => {
  * @returns {Promise<QueryResult>}
  */
 const queryUsers = async (filter, options) => {
-  const users = await User.paginate(filter, options);
+  const mongoFilter = { ...filter };
+  if (mongoFilter.name) {
+    mongoFilter.name = { $regex: mongoFilter.name, $options: 'i' };
+  }
+  if (mongoFilter.phoneNumber) {
+    mongoFilter.phoneNumber = { $regex: mongoFilter.phoneNumber, $options: 'i' };
+  }
+  const users = await User.paginate(mongoFilter, options);
   return users;
 };
 
@@ -60,15 +62,6 @@ const getUserById = async (id) => {
 };
 
 /**
- * Get user by email
- * @param {string} email
- * @returns {Promise<User>}
- */
-const getUserByEmail = async (email) => {
-  return User.findOne({ email });
-};
-
-/**
  * Get user by phone number
  * @param {string} phoneNumber - E.164 formatted phone number
  * @returns {Promise<User>}
@@ -78,7 +71,7 @@ const getUserByPhoneNumber = async (phoneNumber) => {
 };
 
 /**
- * Update user by id (admin only or self-update)
+ * Update user by id (admin only)
  * @param {ObjectId} userId
  * @param {Object} updateBody
  * @param {ObjectId} [updatedById] - ID of the user performing the update
@@ -90,15 +83,16 @@ const updateUserById = async (userId, updateBody, updatedById) => {
     throw new ApiError(httpStatus.NOT_FOUND, 'User not found');
   }
 
-  if (updateBody.email && (await User.isEmailTaken(updateBody.email, userId))) {
-    throw new ApiError(httpStatus.BAD_REQUEST, 'Email already taken');
-  }
-
   if (updateBody.phoneNumber) {
     updateBody.phoneNumber = normalizePhoneNumber(updateBody.phoneNumber);
     if (await User.isPhoneNumberTaken(updateBody.phoneNumber, userId)) {
       throw new ApiError(httpStatus.BAD_REQUEST, 'Phone number already taken');
     }
+  }
+
+  // Guard: only seed script can create admins
+  if (updateBody.role === 'admin') {
+    throw new ApiError(httpStatus.FORBIDDEN, 'Admin role can only be assigned via seed script');
   }
 
   // Guard: do not allow deactivating the last active admin
@@ -167,7 +161,6 @@ module.exports = {
   createUser,
   queryUsers,
   getUserById,
-  getUserByEmail,
   getUserByPhoneNumber,
   updateUserById,
   softDeleteUserById,

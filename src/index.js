@@ -14,6 +14,8 @@ mongoose.connect(config.mongoose.url, config.mongoose.options).then(async () => 
   }
   server = app.listen(config.port, () => {
     logger.info(`Listening to port ${config.port}`);
+    // Allow up to 5 minutes for long-running requests (e.g. OCR on scanned PDFs)
+    server.setTimeout(5 * 60 * 1000);
   });
 });
 

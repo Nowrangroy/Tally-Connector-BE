@@ -61,12 +61,14 @@ const callTool = async (name, args) => {
   let client;
   try {
     client = await initializeMcpClient();
-    const result = await client.callTool({ name, arguments: args });
+    // 4.5-minute timeout — OCR on scanned PDFs can take up to 2-3 minutes
+    const TOOL_TIMEOUT_MS = 4.5 * 60 * 1000;
+    const result = await client.callTool({ name, arguments: args }, undefined, { timeout: TOOL_TIMEOUT_MS });
     return result;
   } catch (error) {
     // If the error looks like a transport / connection issue, reset and retry once
     const isTransportError =
-      error?.code === -32001 ||           // MCP transport closed
+      error?.code === -32000 ||           // MCP ConnectionClosed
       error?.message?.includes('closed') ||
       error?.message?.includes('transport') ||
       error?.message?.includes('connect');
@@ -76,7 +78,8 @@ const callTool = async (name, args) => {
       resetClient();
       try {
         client = await initializeMcpClient();
-        const result = await client.callTool({ name, arguments: args });
+        const TOOL_TIMEOUT_MS = 4.5 * 60 * 1000;
+        const result = await client.callTool({ name, arguments: args }, undefined, { timeout: TOOL_TIMEOUT_MS });
         return result;
       } catch (retryError) {
         console.error(`[MCP] Retry also failed for tool "${name}":`, retryError);

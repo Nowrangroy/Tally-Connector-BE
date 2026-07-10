@@ -20,6 +20,9 @@ const createUser = catchAsync(async (req, res) => {
 const getUsers = catchAsync(async (req, res) => {
   const filter = pick(req.query, ['name', 'phoneNumber', 'role', 'isActive']);
 
+  // Exclude the requesting user from the list
+  filter._id = { $ne: req.user.id };
+
   // Support filtering by a single company membership
   if (req.query.company) {
     filter.companies = req.query.company;

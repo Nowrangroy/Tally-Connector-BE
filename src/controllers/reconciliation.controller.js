@@ -1,4 +1,4 @@
-// Trigger nodemon reload for fresh Stdio MCP Client - V3 OCR
+// Trigger nodemon reload for fresh Stdio MCP Client - V4 Timeout+Batch OCR
 const httpStatus = require('http-status');
 const catchAsync = require('../utils/catchAsync');
 const mcpService = require('../services/mcp.service');
