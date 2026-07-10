@@ -225,9 +225,27 @@ const reconcile = catchAsync(async (req, res) => {
     }
 
     if (partyStatementRows.length > 0) {
-      mcpArguments.partyStatementRows = partyStatementRows;
+      if (toolName === 'bank-reconciliation') {
+        mcpArguments.bankStatementRows = partyStatementRows;
+      } else {
+        mcpArguments.partyStatementRows = partyStatementRows;
+      }
     } else if (statementRowsCompact.length > 0) {
-      mcpArguments.statementRowsCompact = statementRowsCompact;
+      if (toolName === 'bank-reconciliation') {
+        mcpArguments.bankStatementRows = statementRowsCompact.map((line) => {
+          const parts = line.split('|');
+          return {
+            "Date": parts[0] || '',
+            "Chq./Ref.No.": parts[1] || '',
+            "Withdrawal Amt.": parseFloat(parts[2]) || 0,
+            "Deposit Amt.": parseFloat(parts[3]) || 0,
+            "Closing Balance": parseFloat(parts[4]) || 0,
+            "Narration": parts[5] || 'Transaction'
+          };
+        });
+      } else {
+        mcpArguments.statementRowsCompact = statementRowsCompact;
+      }
     } else {
       return res.status(httpStatus.BAD_REQUEST).send({
         message:
