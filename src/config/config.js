@@ -23,6 +23,14 @@ const envVarsSchema = Joi.object()
     SMTP_USERNAME: Joi.string().description('username for email server'),
     SMTP_PASSWORD: Joi.string().description('password for email server'),
     EMAIL_FROM: Joi.string().description('the from field in the emails sent by the app'),
+    // Twilio Verify – required in production/development, optional in test (mocked)
+    TWILIO_ACCOUNT_SID: Joi.string().description('Twilio Account SID'),
+    TWILIO_AUTH_TOKEN: Joi.string().description('Twilio Auth Token'),
+    TWILIO_VERIFY_SERVICE_SID: Joi.string().description('Twilio Verify Service SID'),
+    OTP_CHANNEL: Joi.string().valid('sms', 'whatsapp', 'call').default('sms').description('OTP delivery channel'),
+    // Seed admin
+    SEED_ADMIN_NAME: Joi.string().description('Name for the first admin (used by seed script)'),
+    SEED_ADMIN_PHONE_NUMBER: Joi.string().description('Phone number for the first admin in E.164 format'),
   })
   .unknown();
 
@@ -60,5 +68,11 @@ module.exports = {
       },
     },
     from: envVars.EMAIL_FROM,
+  },
+  twilio: {
+    accountSid: envVars.TWILIO_ACCOUNT_SID,
+    authToken: envVars.TWILIO_AUTH_TOKEN,
+    verifyServiceSid: envVars.TWILIO_VERIFY_SERVICE_SID,
+    otpChannel: envVars.OTP_CHANNEL,
   },
 };
