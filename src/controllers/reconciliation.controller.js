@@ -63,7 +63,8 @@ const parseExcelRows = (buffer) => {
 const parsePdfRows = async (buffer) => {
   const parser = new PDFParse(new Uint8Array(buffer));
   await parser.load();
-  const text = (await parser.getText()) || '';
+  const textObj = await parser.getText();
+  const text = (textObj && textObj.pages) ? textObj.pages.map((p) => p.text).join('\n') : '';
   const lines = text.split('\n');
   const statementRowsCompact = [];
 
