@@ -264,9 +264,10 @@ const reconcile = catchAsync(async (req, res) => {
         } catch (parseErr) {
           console.error("PDF extraction via parse-bank-statement MCP tool failed:", parseErr);
         } finally {
-          if (fs.existsSync(tempFilePath)) {
-            try { fs.unlinkSync(tempFilePath); } catch (e) {}
-          }
+          // Temporarily comment out for debugging/retrieving the PDF
+          // if (fs.existsSync(tempFilePath)) {
+          //   try { fs.unlinkSync(tempFilePath); } catch (e) {}
+          // }
         }
       }
 
