@@ -2,7 +2,7 @@ const httpStatus = require('http-status');
 const catchAsync = require('../utils/catchAsync');
 const mcpService = require('../services/mcp.service');
 const XLSX = require('xlsx');
-const pdfParse = require('pdf-parse');
+const { PDFParse } = require('pdf-parse');
 const fs = require('fs');
 const path = require('path');
 const https = require('https');
@@ -61,7 +61,8 @@ const parseExcelRows = (buffer) => {
  * Returns { sourceFormat, statementRowsCompact }
  */
 const parsePdfRows = async (buffer) => {
-  const parsedPdf = await pdfParse(buffer);
+  const parser = new PDFParse({ data: buffer });
+  const parsedPdf = await parser.getText();
   const text = parsedPdf.text || '';
   const lines = text.split('\n');
   const statementRowsCompact = [];
