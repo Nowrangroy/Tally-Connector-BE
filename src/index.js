@@ -4,7 +4,6 @@ const config = require('./config/config');
 const logger = require('./config/logger');
 const { initializeMcpClient } = require('./services/mcp.service');
 
-// Reload trigger: 2026-07-10 14:15
 let server;
 mongoose.connect(config.mongoose.url, config.mongoose.options).then(async () => {
   logger.info('Connected to MongoDB');

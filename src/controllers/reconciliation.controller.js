@@ -61,9 +61,9 @@ const parseExcelRows = (buffer) => {
  * Returns { sourceFormat, statementRowsCompact }
  */
 const parsePdfRows = async (buffer) => {
-  const parser = new PDFParse({ data: buffer });
-  const parsedPdf = await parser.getText();
-  const text = parsedPdf.text || '';
+  const parser = new PDFParse(new Uint8Array(buffer));
+  await parser.load();
+  const text = (await parser.getText()) || '';
   const lines = text.split('\n');
   const statementRowsCompact = [];
 
@@ -225,27 +225,9 @@ const reconcile = catchAsync(async (req, res) => {
     }
 
     if (partyStatementRows.length > 0) {
-      if (toolName === 'bank-reconciliation') {
-        mcpArguments.bankStatementRows = partyStatementRows;
-      } else {
-        mcpArguments.partyStatementRows = partyStatementRows;
-      }
+      mcpArguments.partyStatementRows = partyStatementRows;
     } else if (statementRowsCompact.length > 0) {
-      if (toolName === 'bank-reconciliation') {
-        mcpArguments.bankStatementRows = statementRowsCompact.map((line) => {
-          const parts = line.split('|');
-          return {
-            "Date": parts[0] || '',
-            "Chq./Ref.No.": parts[1] || '',
-            "Withdrawal Amt.": parseFloat(parts[2]) || 0,
-            "Deposit Amt.": parseFloat(parts[3]) || 0,
-            "Closing Balance": parseFloat(parts[4]) || 0,
-            "Narration": parts[5] || 'Transaction'
-          };
-        });
-      } else {
-        mcpArguments.statementRowsCompact = statementRowsCompact;
-      }
+      mcpArguments.statementRowsCompact = statementRowsCompact;
     } else {
       return res.status(httpStatus.BAD_REQUEST).send({
         message:
