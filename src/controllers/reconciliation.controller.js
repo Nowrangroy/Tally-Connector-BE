@@ -66,6 +66,10 @@ const parsePdfRows = async (buffer) => {
   const textObj = await parser.getText();
   const text = (textObj && textObj.pages) ? textObj.pages.map((p) => p.text).join('\n') : '';
   const lines = text.split('\n');
+  
+  console.log(`[parsePdfRows] Extracted PDF text: ${lines.length} lines. First 20 lines:`);
+  console.log(lines.slice(0, 20).join('\n'));
+
   const statementRowsCompact = [];
 
   lines.forEach((line) => {
@@ -74,10 +78,11 @@ const parsePdfRows = async (buffer) => {
       /(\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4})|(\d{1,2}\s+[A-Za-z]{3,9}\s+\d{2,4})/
     );
     if (dateMatch) {
-      const numbers = trimmed.match(/\b\d[\d,]*\.\d{2}\b/g);
+      const date = dateMatch[0];
+      const lineWithoutDate = trimmed.replace(date, '').trim();
+      const numbers = lineWithoutDate.match(/\b\d[\d,]*(\.\d{2})?\b/g);
       if (numbers && numbers.length > 0) {
-        const date = dateMatch[0];
-        let narration = trimmed.replace(date, '').trim();
+        let narration = lineWithoutDate;
         numbers.forEach((n) => { narration = narration.replace(n, ''); });
         narration = narration.replace(/[^a-zA-Z\s]/g, ' ').replace(/\s+/g, ' ').trim();
         const cleanNumbers = numbers.map((n) => parseFloat(n.replace(/,/g, '')));
@@ -210,22 +215,73 @@ const reconcile = catchAsync(async (req, res) => {
   const fileExtension = req.file.originalname.split('.').pop().toLowerCase();
 
   try {
+    const mcpArguments = { targetCompany, fromDate, toDate, sourceFormat };
+
     if (['xlsx', 'xls', 'csv'].includes(fileExtension)) {
       sourceFormat = 'excel';
+      mcpArguments.sourceFormat = 'excel';
       partyStatementRows = parseExcelRows(req.file.buffer);
     } else if (fileExtension === 'pdf') {
       sourceFormat = 'pdf';
-      statementRowsCompact = await parsePdfRows(req.file.buffer);
-    }
+      mcpArguments.sourceFormat = 'pdf';
+      
+      if (toolName === 'bank-reconciliation') {
+        const uploadDir = path.join(__dirname, '../uploads');
+        if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+        const tempFilePath = path.join(uploadDir, `temp-${Date.now()}-${req.file.originalname}`);
+        fs.writeFileSync(tempFilePath, req.file.buffer);
 
-    const mcpArguments = { targetCompany, fromDate, toDate, sourceFormat };
+        try {
+          console.log(`Parsing PDF statement via parse-bank-statement MCP tool...`);
+          const parseResult = await mcpService.callTool('parse-bank-statement', {
+            filePath: tempFilePath,
+            bankLedgerName: ledgerName || '',
+            targetCompany: targetCompany
+          });
+
+          if (parseResult && !parseResult.isError) {
+            const text = parseResult.content?.[0]?.text;
+            if (text) {
+              const parsed = JSON.parse(text);
+              if (parsed && Array.isArray(parsed.transactions) && parsed.transactions.length > 0) {
+                mcpArguments.bankStatementRows = parsed.transactions.map((t) => {
+                  const amtVal = Math.abs(t.amount || 0);
+                  const isDebit = t.voucher_type === 'Payment' || t.amount < 0 || String(t.type || '').toLowerCase() === 'withdrawal';
+                  return {
+                    "Date": t.date,
+                    "Narration": t.narration || '',
+                    "Chq./Ref.No.": t.voucher_no || '',
+                    "Value Dt": t.date,
+                    "Withdrawal Amt.": isDebit ? amtVal : 0,
+                    "Deposit Amt.": !isDebit ? amtVal : 0,
+                    "Closing Balance": t.balance || 0
+                  };
+                });
+              }
+            }
+          }
+        } catch (parseErr) {
+          console.error("PDF extraction via parse-bank-statement MCP tool failed:", parseErr);
+        } finally {
+          if (fs.existsSync(tempFilePath)) {
+            try { fs.unlinkSync(tempFilePath); } catch (e) {}
+          }
+        }
+      }
+
+      if (!mcpArguments.bankStatementRows || mcpArguments.bankStatementRows.length === 0) {
+        statementRowsCompact = await parsePdfRows(req.file.buffer);
+      }
+    }
 
     if (ledgerName) {
       mcpArguments.ledgerName = ledgerName;
       mcpArguments.ledgerNames = [ledgerName];
     }
 
-    if (partyStatementRows.length > 0) {
+    if (mcpArguments.bankStatementRows && mcpArguments.bankStatementRows.length > 0) {
+      // already set from PDF/MCP parser
+    } else if (partyStatementRows.length > 0) {
       mcpArguments.partyStatementRows = partyStatementRows;
     } else if (statementRowsCompact.length > 0) {
       mcpArguments.statementRowsCompact = statementRowsCompact;
