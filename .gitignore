@@ -14,3 +14,7 @@ coverage
 # Uploads and temporary files
 src/uploads
 scripts
+
+# Logs
+error.txt
+server.txt

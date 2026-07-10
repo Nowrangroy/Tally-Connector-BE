@@ -31,6 +31,7 @@ const envVarsSchema = Joi.object()
     // Seed admin
     SEED_ADMIN_NAME: Joi.string().description('Name for the first admin (used by seed script)'),
     SEED_ADMIN_PHONE_NUMBER: Joi.string().description('Phone number for the first admin in E.164 format'),
+    CORS_ORIGIN: Joi.string().default('*').description('Allowed CORS origins'),
   })
   .unknown();
 
@@ -69,6 +70,7 @@ module.exports = {
     },
     from: envVars.EMAIL_FROM,
   },
+  corsOrigin: envVars.CORS_ORIGIN,
   twilio: {
     accountSid: envVars.TWILIO_ACCOUNT_SID,
     authToken: envVars.TWILIO_AUTH_TOKEN,
